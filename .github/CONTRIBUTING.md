@@ -10,7 +10,7 @@ drainsim에 관심을 가져 주셔서 감사합니다. Go나 Kubernetes에 대�
 
 ## 어디서 시작하나요?
 
-- 질문이나 초기 아이디어는 [Discussions](https://github.com/kang0225/kube-drainsim/discussions)에 남겨 주세요.
+- 질문이나 초기 아이디어는 [Discussions](https://github.com/drainsim-project/kube-drainsim/discussions)에 남겨 주세요.
 - 재현 가능한 문제는 버그 양식, 새로운 동작은 기능·설계 제안 양식을 사용해 주세요.
 - 분석과 실제 drain을 비교할 사례는 drain 검증 시나리오 양식을 사용해 주세요.
 - 작업할 이슈에 구현 방향을 남기면 중복 작업을 줄일 수 있습니다. 처음 참여한다면 `good first issue` 또는 `help wanted` 라벨도 살펴보세요.

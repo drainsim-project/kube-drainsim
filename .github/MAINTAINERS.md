@@ -10,7 +10,7 @@
 - squash merge를 사용하며 병합 후 작업 브랜치는 자동 삭제됩니다. `main`의 삭제와 강제 push는 차단합니다.
 - 팀 구성 전 초기 운영을 위해 관리자에게 PR을 통한 규칙 우회 권한을 두었습니다. 일반 push에는 이 예외가 적용되지 않습니다. 예외를 사용해 병합할 때도 실행된 검사를 확인하고, 팀원이 합류하면 예외가 계속 필요한지 검토합니다.
 
-규칙은 [Main branch protection](https://github.com/kang0225/kube-drainsim/rules/25827265)에서 확인할 수 있습니다. 저장소 설정을 변경하면 이 문서도 함께 수정합니다.
+규칙은 [Main branch protection](https://github.com/drainsim-project/kube-drainsim/rules/25827265)에서 확인할 수 있습니다. 저장소 설정을 변경하면 이 문서도 함께 수정합니다.
 
 ## 자동 검사와 리뷰
 
@@ -24,7 +24,7 @@
 
 ## 작업 분류와 참여 안내
 
-[Issues](https://github.com/kang0225/kube-drainsim/issues)의 양식은 버그 제보, 기능·설계 제안, drain 검증 시나리오로 구성합니다. 질문과 초기 아이디어는 [Discussions](https://github.com/kang0225/kube-drainsim/discussions)에서 나눕니다.
+[Issues](https://github.com/drainsim-project/kube-drainsim/issues)의 양식은 버그 제보, 기능·설계 제안, drain 검증 시나리오로 구성합니다. 질문과 초기 아이디어는 [Discussions](https://github.com/drainsim-project/kube-drainsim/discussions)에서 나눕니다.
 
 - `area/*`는 데이터 수집, 분석 엔진, CLI, 검증, CI의 작업 영역을 표시합니다.
 - `priority/p0`, `priority/p1`, `priority/p2`는 우선순위를 표시합니다.
