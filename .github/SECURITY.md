@@ -6,7 +6,7 @@
 
 ## 비공개로 알려 주세요
 
-취약점이나 민감한 정보 노출을 발견했다면 [GitHub 비공개 보안 제보](https://github.com/kang0225/kube-drainsim/security/advisories/new)를 이용해 주세요. 공개 이슈나 Discussions에 악용 방법, 자격 증명, 피해 환경 정보를 게시하지 마세요.
+취약점이나 민감한 정보 노출을 발견했다면 [GitHub 비공개 보안 제보](https://github.com/drainsim-project/kube-drainsim/security/advisories/new)를 이용해 주세요. 공개 이슈나 Discussions에 악용 방법, 자격 증명, 피해 환경 정보를 게시하지 마세요.
 
 비공개 제보 화면을 사용할 수 없다면, 공개 공간에는 민감한 내용 없이 관리자에게 비공개 연락 방법을 요청해 주세요.
 
