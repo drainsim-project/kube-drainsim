@@ -42,6 +42,19 @@ jobs:
           go-version-file: go.mod
           cache: ${{ hashFiles('go.sum') != '' }}
 
+      - name: Detect Go packages
+        if: steps.module.outputs.present == 'true'
+        id: packages
+        shell: bash
+        run: |
+          packages="$(go list ./...)"
+          if test -n "$packages"; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "Go module initialized; vet, tests, and Go review are not running yet because there are no Go packages." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Check Go formatting
         if: steps.module.outputs.present == 'true'
         shell: bash
@@ -54,15 +67,15 @@ jobs:
           fi
 
       - name: Run go vet
-        if: steps.module.outputs.present == 'true'
+        if: steps.packages.outputs.present == 'true'
         run: go vet ./...
 
       - name: Run tests with the race detector
-        if: steps.module.outputs.present == 'true'
+        if: steps.packages.outputs.present == 'true'
         run: go test -race -count=1 ./...
 
       - name: Review Go code with reviewdog
-        if: steps.module.outputs.present == 'true'
+        if: steps.packages.outputs.present == 'true'
         uses: reviewdog/action-golangci-lint@284129a3ac23bc5d8ac1522e0b6511df74a8836d # v2.10.2
         with:
           go_version_file: go.mod
