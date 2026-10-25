@@ -1,0 +1,59 @@
+name: 기능·설계 제안
+description: 해결할 문제와 제안하는 기능 또는 설계 방향을 알려 주세요.
+title: "[Feature] "
+labels: [enhancement, needs-triage]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 어떤 문제를 해결하려고 하나요?
+      description: 누가 어떤 상황에서 어려움을 겪는지 구체적으로 적어 주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 제안하는 동작 또는 설계
+      description: 사용자가 어떤 입력을 주고 어떤 결과를 얻을지 설명해 주세요. 구현 방법은 확정하지 않아도 됩니다.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: 이번 제안의 범위
+      description: 처음에 필요한 부분과 이후로 미룰 부분을 구분해 주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: 완료 여부를 어떻게 확인할 수 있나요?
+      description: 확인할 예시, 기대 결과, 필요한 테스트나 비교 방법을 적어 주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 대안과 고려할 점
+      description: 기존 도구, 더 작은 해결책, 예상되는 제약이 있다면 적어 주세요.
+  - type: dropdown
+    id: area
+    attributes:
+      label: 관련 영역
+      options:
+        - 아직 모르겠어요
+        - 데이터 수집
+        - 분석 엔진
+        - CLI·리포트
+        - 검증·테스트
+        - CI·협업 환경
+        - 문서
+    validations:
+      required: true
+  - type: checkboxes
+    id: disclosure_check
+    attributes:
+      label: 공개 전 확인
+      options:
+        - label: 예시에 토큰, kubeconfig, 개인정보와 민감한 운영정보가 포함되지 않았습니다.
+          required: true

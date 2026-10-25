@@ -1,0 +1,88 @@
+name: Repository checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  configuration:
+    name: Repository configuration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate YAML and issue form structure
+        shell: bash
+        run: |
+          ruby <<'RUBY'
+          require "yaml"
+
+          paths = Dir.glob(".github/**/*.{yml,yaml}").sort
+          abort "No repository configuration files found" if paths.empty?
+
+          paths.each do |path|
+            data = YAML.safe_load(File.read(path), aliases: true)
+            abort "#{path}: top level must be a mapping" unless data.is_a?(Hash)
+            puts "Parsed #{path}"
+
+            next unless path.start_with?(".github/ISSUE_TEMPLATE/")
+            next if File.basename(path) == "config.yml"
+
+            %w[name description].each do |key|
+              abort "#{path}: missing #{key}" unless data[key].is_a?(String) && !data[key].strip.empty?
+            end
+            body = data["body"]
+            abort "#{path}: body must be a nonempty array" unless body.is_a?(Array) && !body.empty?
+
+            ids = []
+            body.each do |field|
+              abort "#{path}: form field must be a mapping" unless field.is_a?(Hash)
+              allowed = %w[markdown input textarea dropdown checkboxes]
+              abort "#{path}: unsupported field type" unless allowed.include?(field["type"])
+              next if field["type"] == "markdown"
+
+              id = field["id"]
+              abort "#{path}: every input needs a unique id" unless id.is_a?(String) && id.match?(/\A[A-Za-z0-9_-]+\z/) && !ids.include?(id)
+              ids << id
+              attributes = field["attributes"]
+              unless attributes.is_a?(Hash) && attributes["label"].is_a?(String) && !attributes["label"].strip.empty?
+                abort "#{path}: every input needs a label"
+              end
+            end
+          end
+          RUBY
+
+  pr-title:
+    name: PR title
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check Conventional Commit title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        shell: bash
+        run: |
+          node <<'JAVASCRIPT'
+          const title = process.env.PR_TITLE || "";
+          const pattern = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9][a-z0-9._/-]*\))?!?: \S.*$/u;
+          if (!pattern.test(title)) {
+            console.error("::error::Use a Conventional Commit title, for example: feat(cli): explain PDB blockers");
+            process.exit(1);
+          }
+          console.log("PR title follows the project convention.");
+          JAVASCRIPT

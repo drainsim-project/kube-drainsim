@@ -1,0 +1,74 @@
+name: Go CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: go-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: Go checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Detect Go module
+        id: module
+        shell: bash
+        run: |
+          if test -f go.mod; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "Go checks are not running yet: this repository has no go.mod." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Set up Go from go.mod
+        if: steps.module.outputs.present == 'true'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: ${{ hashFiles('go.sum') != '' }}
+
+      - name: Check Go formatting
+        if: steps.module.outputs.present == 'true'
+        shell: bash
+        run: |
+          unformatted="$(gofmt -l .)"
+          if test -n "$unformatted"; then
+            printf '%s\n' "$unformatted"
+            echo "::error::Run gofmt on the files listed above."
+            exit 1
+          fi
+
+      - name: Run go vet
+        if: steps.module.outputs.present == 'true'
+        run: go vet ./...
+
+      - name: Run tests with the race detector
+        if: steps.module.outputs.present == 'true'
+        run: go test -race -count=1 ./...
+
+      - name: Review Go code with reviewdog
+        if: steps.module.outputs.present == 'true'
+        uses: reviewdog/action-golangci-lint@284129a3ac23bc5d8ac1522e0b6511df74a8836d # v2.10.2
+        with:
+          go_version_file: go.mod
+          golangci_lint_version: v2.15.0
+          reviewdog_version: v0.21.2
+          reporter: github-annotations
+          filter_mode: nofilter
+          fail_level: error
+          cache: ${{ hashFiles('go.sum') != '' }}
