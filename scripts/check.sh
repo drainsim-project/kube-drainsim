@@ -11,11 +11,12 @@ golangci_lint_version=v2.15.0
 actionlint_version=v1.7.12
 
 check_fmt() {
-  local unformatted
-  unformatted="$(gofmt -l .)"
+  local go_root unformatted
+  go_root="$(go env GOROOT)"
+  unformatted="$("$go_root/bin/gofmt" -l .)"
   if [[ -n $unformatted ]]; then
     printf '%s\n' "$unformatted"
-    echo "Run gofmt -w on the files above." >&2
+    echo 'Run "$(go env GOROOT)/bin/gofmt" -w on the files above.' >&2
     return 1
   fi
 }

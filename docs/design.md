@@ -53,7 +53,7 @@ dry-run은 거절 여부만 알려 주고, 어떤 PDB의 어떤 값 때문에 �
 
 ### eviction과 PDB
 
-퇴거 대상 Pod는 eviction API와 같은 순서로 판단합니다.
+퇴거 대상 Pod는 eviction API의 검사 순서를 따릅니다. 오류 상태이거나 판단 근거가 부족하면 drainsim은 `unknown`으로 분류합니다.
 
 1. `Pending`, `Succeeded`, `Failed` 상태의 Pod와 이미 삭제 중인 Pod는 PDB를 확인하지 않고 퇴거됩니다. → `evictable`
 2. 같은 네임스페이스에서 selector가 Pod 라벨과 맞는 PDB를 찾습니다. 없으면 → `evictable`, 2개 이상이면 API가 500으로 거절합니다. → `blocked`
@@ -61,21 +61,25 @@ dry-run은 거절 여부만 알려 주고, 어떤 PDB의 어떤 값 때문에 �
    - `unhealthyPodEvictionPolicy`가 `AlwaysAllow`
    - 기본값 `IfHealthyBudget`에서 `currentHealthy >= desiredHealthy`이고 `desiredHealthy > 0`
 4. `status.observedGeneration`이 `metadata.generation`보다 작으면 API가 지금은 429로 거절하고, 상태 값으로 예산을 판단할 수 없습니다. → `unknown`
-5. `disruptionsAllowed`가 0이면 API가 429로 거절합니다. PDB 컨트롤러는 이 값을 `currentHealthy - desiredHealthy`로 계산하고, 음수이거나 `expectedPods`가 0이면 0으로 둡니다.
+5. `disruptionsAllowed`가 음수이거나 `status.disruptedPods` 항목이 2,000개를 초과하면 API가 403으로 거절합니다. 정상적인 예산 부족과 구분합니다. → `unknown`
+6. `DisruptionAllowed` 조건의 reason이 `SyncFailed`이면 PDB 컨트롤러가 동기화에 실패한 상태입니다. API가 이 조건을 직접 검사하지는 않지만, drainsim은 예산 부족의 원인을 단정하지 않습니다. 다른 상태 값이 서로 맞지 않아 원인을 판단할 수 없는 경우도 같습니다. → `unknown`
+7. 위 검사를 통과하고 `disruptionsAllowed`가 0이면 API가 429로 거절합니다.
    - `desiredHealthy`가 `expectedPods` 이상이면 Pod가 `expectedPods`만큼 정상이어도 예산이 0입니다. → `blocked`
-   - 그렇지 않으면 정상 Pod가 늘어 예산이 회복되어야 퇴거할 수 있습니다. → `no-budget`
-6. `disruptionsAllowed`가 1 이상이면 eviction마다 1씩 줄어듭니다. 같은 PDB에 묶인 노드의 Pod 중 `disruptionsAllowed`개까지는 → `evictable`, 나머지는 → `no-budget`. 어느 Pod가 먼저 예산을 쓸지는 정해져 있지 않습니다.
+   - 그렇지 않으면 현재 예산이 부족한 상태입니다. → `no-budget`
+8. `disruptionsAllowed`가 1 이상이면 eviction마다 1씩 줄어듭니다. 같은 PDB에 묶인 노드의 Pod 중 `disruptionsAllowed`개까지는 → `evictable`, 나머지는 → `no-budget`. 어느 Pod가 먼저 예산을 쓸지는 정해져 있지 않습니다.
+
+정상 동기화 시 PDB 컨트롤러는 예산을 `currentHealthy - desiredHealthy`로 계산하고, 계산 결과가 0 이하이거나 `expectedPods`가 0 이하이면 0으로 둡니다. 동기화 실패 때도 예산을 0으로 두므로 숫자만으로 원인을 판단하지 않습니다. 또한 `disruptedPods`에 기록된 기존 Ready Pod는 일시적으로 `currentHealthy`에서 제외됩니다. 삭제되지 않은 Pod의 기록이 만료되면 새 Pod 생성이나 Ready 전환 없이도 다시 계산에 포함되어 예산이 회복될 수 있습니다.
 
 ## 결과 분류 (제안)
 
 | 결과 | 의미 |
 | --- | --- |
 | `evictable` | 지금 eviction이 허용됨 |
-| `no-budget` | PDB 예산이 부족해 지금 eviction이 거절됨. 정상 Pod가 늘어 예산이 회복되어야 함 |
+| `no-budget` | 현재 PDB 예산이 부족해 eviction이 거절됨 |
 | `blocked` | PDB 설정 때문에 eviction이 거절됨. 정상 Pod가 `expectedPods`만큼 있어도 예산이 0이거나, PDB가 2개 이상 걸림 |
 | `needs-flag` | 표시한 `kubectl drain` 옵션이 없으면 drain이 Pod를 퇴거하기 전에 중단됨 |
 | `skipped` | drain이 건드리지 않음 |
-| `unknown` | 판단할 근거가 부족함 |
+| `unknown` | PDB 오류 상태이거나 판단할 근거가 부족함 |
 
 `no-budget`과 `blocked`는 지금 eviction이 거절되는 근거를 설명합니다. 예산이 회복될지, 언제 회복될지, drain이 최종적으로 성공할지는 판단하지 않습니다. `evictable`도 PDB가 막지 않는다는 뜻일 뿐, drain 전체의 성공이나 서비스 가용성을 보장하지 않습니다.
 

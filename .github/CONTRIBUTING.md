@@ -14,7 +14,7 @@ drainsim 팀원이 작업을 제안하고 PR로 반영하는 절차를 설명합
 2. 한 PR에는 검토 가능한 크기의 변경을 담고, 진행 중인 작업은 draft PR로 공유합니다.
 3. PR 제목은 `feat: PDB 분석 추가`, `fix: 보고서 오류 수정`, `docs: 검증 안내 보완`처럼 Conventional Commits 형식으로 적습니다.
 4. 본문은 PR 템플릿을 따르고, 검증 결과는 템플릿의 체크리스트로 남깁니다.
-5. 다른 팀원 1명의 승인을 받고 리뷰 대화를 해결합니다. CodeRabbit 의견도 반영하거나 이유를 남겨 해결하며, 팀원 승인으로 세지 않습니다.
+5. 팀원 리뷰와 승인은 권장하며 병합의 필수 조건은 아닙니다. 리뷰 대화는 의견을 반영하거나 이유를 남겨 해결합니다. CodeRabbit 리뷰도 같은 기준으로 처리합니다.
 6. 필수 검사를 통과하면 squash merge합니다. PR 제목이 최종 커밋 제목이 됩니다.
 
 일정이 바뀌거나 막히면 이슈나 PR에 상황과 필요한 도움을 남겨 주세요. 세부 병합 설정은 [GitHub 규칙](https://github.com/drainsim-project/kube-drainsim/rules/25827265)에서 확인합니다.
@@ -34,3 +34,5 @@ drainsim 팀원이 작업을 제안하고 PR로 반영하는 절차를 설명합
 공개 저장소이므로 이슈, PR, 로그에 토큰, kubeconfig, Secret 값, 개인정보, 운영환경 정보를 올리지 마세요. 재현에는 익명화한 최소 예시를 씁니다.
 
 Dependabot 보안 알림과 보안 업데이트, Secret scanning과 push protection을 사용합니다.
+
+취약점 제보는 [비공개 취약점 신고](https://github.com/drainsim-project/kube-drainsim/security/advisories/new)를 사용합니다.
