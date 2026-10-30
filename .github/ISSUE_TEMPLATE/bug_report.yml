@@ -6,7 +6,7 @@ body:
   - type: textarea
     id: summary
     attributes:
-      label: 어떤 문제인가요?
+      label: 문제 내용
       description: 문제가 발생하는 상황과 영향을 간단히 설명해 주세요.
     validations:
       required: true

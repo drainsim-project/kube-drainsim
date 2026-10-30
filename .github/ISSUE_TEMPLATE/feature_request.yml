@@ -6,7 +6,7 @@ body:
   - type: textarea
     id: problem
     attributes:
-      label: 어떤 문제를 해결하려고 하나요?
+      label: 제안 배경
       description: 누가 어떤 상황에서 어려움을 겪는지 적어 주세요.
     validations:
       required: true
