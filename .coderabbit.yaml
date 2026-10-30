@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# 협업 절차와 필수 검사 기준은 .github/CONTRIBUTING.md를 참고합니다.
+language: ko-KR
+
+reviews:
+  # 병합 승인은 팀원이 합니다. CodeRabbit은 코멘트만 남깁니다.
+  auto_approvals:
+    enabled: false
+  pre_merge_checks:
+    # 문서 주석 비율은 팀 기준으로 두지 않습니다.
+    docstrings:
+      mode: "off"
+  path_instructions:
+    - path: "**/*.go"
+      instructions: |
+        drainsim은 drain 전에 클러스터를 조회해 PDB 제약을 설명하는 kubectl 플러그인입니다.
+        - 테스트가 아닌 코드가 클러스터 상태를 바꾸는 요청을 보내지 않는지 확인해 주세요.
+        - 판단 로직이 docs/design.md의 판단 규칙과 결과 분류를 따르는지 확인해 주세요.
+        - 근거가 부족한 경우를 evictable로 처리하지 않고 unknown으로 구분하는지 확인해 주세요.
+        - 결과나 메시지가 예산 회복 여부, 회복 시점, drain의 최종 성공을 단정하지 않는지 확인해 주세요.
+    - path: "**/*_test.go"
+      instructions: |
+        - 테스트가 실제 kubeconfig나 클러스터에 암묵적으로 접속하지 않는지 확인해 주세요.
+        - fake client 테스트를 실제 PDB와 drain 동작의 검증으로 설명하지 않는지 확인해 주세요.
+    - path: ".github/workflows/**"
+      instructions: |
+        - Actions 참조를 전체 커밋 SHA로 고정했는지, permissions가 필요한 최소 권한인지 확인해 주세요.
+  tools:
+    # CI의 Go checks와 Workflow review가 실행하므로 중복 코멘트를 막습니다.
+    golangci-lint:
+      enabled: false
+    actionlint:
+      enabled: false

@@ -1,99 +1,35 @@
 name: drain 검증 시나리오
-description: 분석 결과를 실제 drain과 비교할 재현 사례를 기록합니다.
+description: drainsim의 판단을 실제 drain과 비교할 사례를 제안합니다.
 title: "[Scenario] "
-labels: [area/validation, needs-triage]
+labels: [scenario]
 body:
   - type: markdown
     attributes:
-      value: |
-        kind 등 폐기 가능한 테스트 환경에서 재현한 사례를 공유해 주세요.
-        운영 클러스터의 kubeconfig, Secret, 토큰, 내부 주소는 첨부하지 마세요.
-        `unknown`은 근거가 부족해 판단을 유보한 결과입니다.
-        `false-safe`는 도구가 문제가 없다고 판단했지만 실제 drain이 막히거나 실패한 오판입니다. 둘을 구분해 주세요.
+      value: 재현은 kind 같은 폐기 가능한 환경에서 합니다. 실행 결과는 이 이슈를 해결하는 PR의 검증 체크리스트에 남깁니다.
   - type: textarea
     id: scenario
     attributes:
       label: 시나리오와 확인할 가설
-      description: 노드·워크로드·PDB의 관계와 확인하려는 조건을 설명해 주세요.
-    validations:
-      required: true
-  - type: input
-    id: kubernetes_version
-    attributes:
-      label: Kubernetes 버전
-      description: 실제 검증한 서버 버전을 적어 주세요. 실행 전 제안이라면 '예정'과 목표 버전을 적어 주세요.
-      placeholder: "v1.x.y / 검증 예정 v1.x.y"
-    validations:
-      required: true
-  - type: textarea
-    id: environment
-    attributes:
-      label: 재현 환경
-      description: kind 버전·노드 이미지, 노드 수, drainsim 버전 또는 커밋 등 결과에 영향을 주는 조건을 적어 주세요.
+      description: 노드, 워크로드, PDB의 관계와 확인하려는 조건을 적어 주세요.
     validations:
       required: true
   - type: textarea
     id: manifests
     attributes:
       label: 최소 재현 manifest
-      description: 테스트에 필요한 Node 설정·워크로드·PDB manifest 등을 적어 주세요. 실제 이름과 주소를 예시 값으로 치환하고 Secret 값은 제거해 주세요. 아직 제안 단계라면 필요한 리소스 구성을 적어 주세요.
+      description: 필요한 Node 설정, 워크로드, PDB를 적어 주세요.
       render: yaml
-    validations:
-      required: true
-  - type: textarea
-    id: commands
-    attributes:
-      label: 실행 순서와 명령
-      description: 준비, 분석, 실제 drain 명령과 사용한 옵션을 순서대로 적어 주세요. 미실행 단계는 표시해 주세요.
     validations:
       required: true
   - type: textarea
     id: expected
     attributes:
       label: 기대하는 결과와 근거
-      description: 어떤 Pod·PDB 때문에 어떤 결과를 예상하는지 적어 주세요. 판단 근거가 부족하면 부족한 정보를 적어 주세요.
+      description: 어떤 Pod가 어떤 결과(evictable, no-budget, blocked 등)가 될지와 그 이유를 적어 주세요.
     validations:
       required: true
-  - type: textarea
-    id: analysis_result
+  - type: input
+    id: kubernetes_version
     attributes:
-      label: drainsim의 실제 분석 결과
-      description: 보고서와 근거를 붙여 주세요. 분석을 실행하지 않았다면 '미실행'으로 적어 주세요. unknown을 성공으로 해석하지 마세요.
-    validations:
-      required: true
-  - type: textarea
-    id: drain_result
-    attributes:
-      label: 실제 drain 결과
-      description: 성공·차단·실패·시간 초과와 관찰한 근거를 적어 주세요. 실행하지 않았다면 '미실행'으로 적고, 시간 초과만으로 실패 원인을 단정하지 마세요.
-    validations:
-      required: true
-  - type: dropdown
-    id: comparison
-    attributes:
-      label: 비교 결과 분류
-      options:
-        - 미검증 — 아직 비교하지 않음
-        - 일치 — 분석과 실제 결과가 일치함
-        - unknown — 도구가 판단을 유보함
-        - false-safe — 도구는 문제가 없다고 판단했지만 실제 drain은 차단·실패함
-        - false-blocked — 도구는 차단을 예상했지만 실제 drain은 성공함
-        - 기타 불일치 — 아래에 설명
-    validations:
-      required: true
-  - type: textarea
-    id: limitations
-    attributes:
-      label: 불확실한 점과 결과의 한계
-      description: 실행 사이에 변한 클러스터 상태, 아직 확인하지 못한 원인, 반복 실행 여부, 기타 불일치를 적어 주세요. 해당 없으면 '없음'으로 적어 주세요.
-    validations:
-      required: true
-  - type: checkboxes
-    id: disclosure_check
-    attributes:
-      label: 공개 전 확인
-      options:
-        - label: manifest·명령·로그에서 토큰, kubeconfig, 개인정보와 민감한 운영정보를 제거했습니다.
-          required: true
-        - label: 실제로 실행한 내용과 아직 검증하지 않은 가정을 구분했습니다.
-          required: true
+      label: Kubernetes 버전
+      placeholder: "v1.34.11"
