@@ -1,0 +1,2 @@
+# Keep shell scripts runnable in Git Bash when core.autocrlf is on.
+*.sh text eol=lf

@@ -1,39 +1,35 @@
 # 저장소 운영 안내
 
-이 문서는 GitHub에 설정한 협업 규칙과 유지관리자가 확인할 항목을 기록합니다. 현재 저장소에는 협업 설정과 Go 모듈(`go.mod`)이 있으며 개발 코드는 아직 없습니다.
+이 문서는 GitHub에 설정한 저장소 규칙과 자동 검사를 기록합니다. 설정을 바꾸면 같은 PR에서 이 문서도 고칩니다.
 
 ## PR과 병합
 
-- `main` 변경은 기능 브랜치의 PR로 제안합니다.
-- 일반적인 병합에는 승인 1명, 리뷰 대화 해결, 필수 검사 통과가 필요합니다. 새 커밋이 올라오면 기존 승인은 해제됩니다.
-- 필수 검사는 `Repository configuration`, `PR title`, `Workflow review`, `Go checks`입니다. 병합 전에 브랜치를 최신 `main`에 맞춥니다.
-- squash merge를 사용하며 병합 후 작업 브랜치는 자동 삭제됩니다. `main`의 삭제와 강제 push는 차단합니다.
-- 팀 구성 전 초기 운영을 위해 관리자에게 PR을 통한 규칙 우회 권한을 두었습니다. 일반 push에는 이 예외가 적용되지 않습니다. 예외를 사용해 병합할 때도 실행된 검사를 확인하고, 팀원이 합류하면 예외가 계속 필요한지 검토합니다.
+`main`에는 [Main branch protection](https://github.com/drainsim-project/kube-drainsim/rules/25827265) 규칙이 적용됩니다.
 
-규칙은 [Main branch protection](https://github.com/drainsim-project/kube-drainsim/rules/25827265)에서 확인할 수 있습니다. 저장소 설정을 변경하면 이 문서도 함께 수정합니다.
+- `main` 변경은 PR로만 반영하며, 관리자도 이 규칙을 우회하지 않습니다.
+- 병합하려면 다른 팀원 1명의 승인, 리뷰 대화 해결, 필수 검사 통과가 필요합니다. 새 커밋을 올리면 기존 승인은 해제됩니다.
+- 필수 검사는 `PR title`, `Workflow review`, `Go checks`입니다. 브랜치를 최신 `main`에 맞추는 것은 병합 조건이 아닙니다.
+- squash merge만 허용하고 PR 제목을 커밋 제목으로 씁니다. 병합한 브랜치는 자동으로 삭제되고, `main`의 삭제와 강제 push는 막혀 있습니다.
 
 ## 자동 검사와 리뷰
 
-- Repository checks는 YAML과 이슈 양식의 구조, PR 제목을 검사합니다.
-- Reviewdog는 actionlint로 워크플로를 검사하고 발견한 내용을 Actions와 PR의 파일 주석으로 표시합니다. AI 리뷰나 사람의 승인을 대신하지 않습니다.
-- Go CI는 `go.mod`에 지정한 Go 버전을 설정하고 Go 패키지를 확인합니다. 패키지가 있으면 `go vet`, race detector를 사용한 테스트와 Go 정적 분석을 실행하며, 패키지가 없는 현재는 생략 이유를 실행 요약에 남깁니다. 패키지 확인 명령 자체에 오류가 나면 검사를 생략하지 않고 실패로 처리합니다. 포맷 검사는 Go 모듈이 있으면 실행합니다.
-- Actions는 기본적으로 저장소 읽기 권한만 사용합니다. 처음 참여하는 외부 기여자의 워크플로는 관리자의 실행 승인이 필요할 수 있습니다.
-- Actions 참조는 전체 커밋 SHA로 고정합니다. Dependabot은 매주 월요일 오전 9시(한국 시간)에 Actions 업데이트를 확인하고, 업데이트가 있으면 묶어서 PR을 제안합니다.
+| 검사 | 워크플로 | 내용 |
+| --- | --- | --- |
+| `PR title` | [pr-title.yml](workflows/pr-title.yml) | PR 제목의 Conventional Commits 형식 |
+| `Workflow review` | [ci.yml](workflows/ci.yml) | actionlint로 워크플로 검사 |
+| `Go checks` | [ci.yml](workflows/ci.yml) | gofmt, `go vet`, race detector를 켠 테스트, golangci-lint |
 
-자동 검사 결과와 함께 사람이 변경 의도, 정확성, 검증 근거를 확인합니다. 실제 drain 검증 결과는 별도로 남깁니다.
+- 검사 명령은 [scripts/check.sh](../scripts/check.sh)에 모아 로컬과 CI가 함께 씁니다. golangci-lint만 CI에서 공식 action으로 실행하며, 버전은 스크립트와 맞춥니다.
+- Actions는 저장소 읽기 권한만 쓰고, 참조는 전체 커밋 SHA로 고정합니다. 업데이트는 Dependabot이 묶어서 PR로 올립니다.
+- CodeRabbit은 PR마다 변경 요약과 리뷰 코멘트를 남기며, 설정은 [.coderabbit.yaml](../.coderabbit.yaml)에 있습니다. 자동 승인을 꺼서 병합 승인에는 포함되지 않지만, 코멘트는 리뷰 대화라서 해결해야 병합할 수 있습니다. golangci-lint와 actionlint는 CI가 실행하므로 CodeRabbit에서는 껐습니다.
 
-## 작업 분류와 참여 안내
+## 이슈 분류
 
-[Issues](https://github.com/drainsim-project/kube-drainsim/issues)의 양식은 버그 제보, 기능·설계 제안, drain 검증 시나리오로 구성합니다. 질문과 초기 아이디어는 [Discussions](https://github.com/drainsim-project/kube-drainsim/discussions)에서 나눕니다.
+이슈 양식은 버그 제보, 기능 제안, drain 검증 시나리오 세 가지이며, 양식마다 `bug`, `enhancement`, `scenario` 라벨이 자동으로 붙습니다. 양식에 맞지 않는 작업을 위해 빈 이슈도 허용합니다.
 
-- `area/*`는 데이터 수집, 분석 엔진, CLI, 검증, CI의 작업 영역을 표시합니다.
-- `priority/p0`, `priority/p1`, `priority/p2`는 우선순위를 표시합니다.
-- `needs-triage`는 아직 분류가 필요한 제안, `blocked`는 선행 작업이나 결정이 필요한 작업에 사용합니다.
-- `good first issue`와 `help wanted`는 참여를 구하는 작업에 사용합니다.
-- 마일스톤은 `M0 - Problem validation`, `v0.1 - Single-node preflight`, `v0.2 - Drain scenario comparison`입니다. 일정과 범위는 팀에서 정합니다.
-
-현재 코드 소유자는 `@kang0225`입니다. 팀원이 합류하면 역할에 맞춰 `CODEOWNERS`와 저장소 권한을 검토합니다. 자세한 참여 흐름은 [기여 안내](CONTRIBUTING.md)를 따릅니다.
+- `blocked`는 선행 작업이나 결정을 기다리는 이슈에 붙입니다.
+- 그 밖에는 GitHub 기본 라벨(`documentation`, `question`, `duplicate`, `invalid`, `wontfix`)만 씁니다. Dependabot PR에는 라벨을 붙이지 않습니다.
 
 ## 보안
 
-Dependabot 보안 알림과 보안 업데이트, Secret scanning과 push protection을 활성화했습니다. 비공개 취약점 제보도 받을 수 있습니다. 제보 방법은 [보안 안내](SECURITY.md)를 확인해 주세요.
+Dependabot 보안 알림과 보안 업데이트, Secret scanning과 push protection을 켰습니다.
