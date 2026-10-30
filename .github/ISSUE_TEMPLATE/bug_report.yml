@@ -24,7 +24,7 @@ body:
     id: result
     attributes:
       label: 기대한 결과와 실제 결과
-      description: 오류 메시지나 잘못된 출력은 민감한 정보를 지운 뒤 붙여 주세요.
+      description: 오류 메시지나 잘못된 출력을 함께 첨부해 주세요.
     validations:
       required: true
   - type: textarea
@@ -37,10 +37,3 @@ body:
         Kubernetes 버전:
         kind 버전 또는 클러스터 환경:
         OS / 아키텍처:
-  - type: checkboxes
-    id: disclosure_check
-    attributes:
-      label: 공개 전 확인
-      options:
-        - label: 토큰, kubeconfig, 개인정보와 민감한 운영정보를 제거했습니다.
-          required: true

@@ -13,19 +13,13 @@
 
 일반 `go test`는 실제 클러스터에 접속하지 않아야 합니다. 클러스터가 필요한 통합 테스트는 그 테스트를 추가하는 PR에서 실행 방법과 함께 분리합니다.
 
+실제 API 서버의 처리, PDB 상태 갱신, eviction과 재배치 동작에 영향을 주는 변경은 kind에서 확인합니다. 로컬 검사 명령과 옵션은 [개발 환경](development.md#로컬-검사)에 있습니다.
+
 ## 예시 데이터와 fake client
 
-- 예시 데이터에는 판단에 쓰는 필드와 상태만 넣고, 어떤 상황인지 테스트 이름이나 주석으로 밝힙니다.
+- 예시 데이터는 해당 테스트 패키지의 `testdata/`에 둡니다. 판단에 쓰는 필드와 상태만 넣고, 어떤 상황인지 테스트 이름이나 주석으로 밝힙니다.
 - PDB 상태(`disruptionsAllowed`, `currentHealthy` 등)를 직접 적었다면 그 값은 컨트롤러가 계산한 결과가 아니라 테스트의 전제입니다.
 - `client-go`의 fake client는 API 서버의 기본값 적용, 검증, 컨트롤러 동작을 흉내 내지 않습니다. fake client로는 매칭과 판단 로직까지만 확인하고, 실제 PDB와 drain 동작은 kind에서 확인합니다.
-
-## 로컬 검사
-
-```sh
-bash scripts/check.sh
-```
-
-CI의 `Go checks`, `Workflow review`와 같은 명령입니다. 단계 선택과 Windows 옵션은 [개발 환경](development.md#로컬-검사)에 있습니다.
 
 ## 실제 동작 비교
 
@@ -37,7 +31,7 @@ CI의 `Go checks`, `Workflow review`와 같은 명령입니다. 단계 선택과
 4. drain 성공, 대체 Pod의 Ready, 서비스 가용성은 따로 확인합니다.
 5. 예상과 실제의 차이를 정확성 기준의 분류로 기록합니다.
 
-결과는 PR 본문의 검증 체크리스트([PR 템플릿](../.github/PULL_REQUEST_TEMPLATE.md))에 남깁니다. PR을 열면 체크리스트가 자동으로 들어갑니다.
+사용한 도구 버전과 manifest, 분석 결과, 실제 결과와 로그를 PR 본문의 검증 항목([PR 템플릿](../.github/PULL_REQUEST_TEMPLATE.md))에 남깁니다.
 
 ## 참고
 

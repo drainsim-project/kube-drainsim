@@ -17,7 +17,7 @@ body:
     id: manifests
     attributes:
       label: 최소 재현 manifest
-      description: 필요한 Node 설정, 워크로드, PDB를 적어 주세요. 실제 이름과 주소는 예시 값으로 바꾸고 Secret 값은 빼 주세요.
+      description: 필요한 Node 설정, 워크로드, PDB를 적어 주세요.
       render: yaml
     validations:
       required: true
@@ -33,10 +33,3 @@ body:
     attributes:
       label: Kubernetes 버전
       placeholder: "v1.34.11"
-  - type: checkboxes
-    id: disclosure_check
-    attributes:
-      label: 공개 전 확인
-      options:
-        - label: manifest와 로그에서 토큰, kubeconfig, 개인정보와 민감한 운영정보를 제거했습니다.
-          required: true

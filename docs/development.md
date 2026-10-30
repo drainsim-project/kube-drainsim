@@ -25,7 +25,7 @@ Go 버전은 [go.mod](../go.mod)를 따릅니다. 설치된 Go가 더 낮으면 
 
 ## 로컬 검사
 
-PR을 올리기 전에 저장소 루트에서 실행합니다.
+변경과 관련된 검사를 로컬에서 실행합니다. 문서만 바꾸면 내용과 링크, 예시 명령을 확인합니다. 전체 검사는 저장소 루트에서 다음과 같이 실행합니다.
 
 ```sh
 bash scripts/check.sh
@@ -39,17 +39,9 @@ Go 패키지가 없으면 Go 관련 검사를 건너뛰고 actionlint는 실행�
 
 race detector에는 cgo와 64비트 C 컴파일러(Windows에서는 mingw-w64)가 필요합니다. 32비트 MinGW만 있으면 `64-bit mode not compiled in` 오류가 납니다. 이때는 `RACE=0 bash scripts/check.sh`로 race 없이 테스트하고, race 검사는 CI 결과로 확인합니다.
 
-## 클러스터 없이 개발하기
+## 테스트 환경
 
-분석 로직은 Pod와 PDB 예시 데이터를 입력으로 하는 Go 테스트로 개발합니다. 예시 데이터는 그 테스트가 있는 패키지의 `testdata/`에 둡니다. 클러스터에 접속하는 테스트는 일반 단위 테스트와 분리합니다. 자세한 기준은 [테스트 기준](testing.md)에 있습니다.
-
-## 실제 Kubernetes가 필요할 때
-
-다음을 확인할 때만 [로컬 Kubernetes 검증](local-cluster.md)으로 kind 클러스터를 만듭니다.
-
-- API에서 수집한 상태가 분석 입력으로 올바르게 바뀌는지
-- PDB 판단이 실제 eviction 거절이나 drain 결과와 맞는지
-- Pod 상태 변화나 PDB 상태 갱신에 영향을 주는 변경
+테스트 종류와 클러스터가 필요한 조건은 [테스트 기준](testing.md#테스트의-구분), kind 재현 절차는 [로컬 Kubernetes 검증](local-cluster.md)을 참고합니다.
 
 ## Windows에서 확인할 사항
 

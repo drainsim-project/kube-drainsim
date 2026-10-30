@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
-# 운영 규칙은 .github/MAINTAINERS.md의 "자동 검사와 리뷰"를 참고합니다.
+# 협업 절차와 필수 검사 기준은 .github/CONTRIBUTING.md를 참고합니다.
 language: ko-KR
 
 reviews:

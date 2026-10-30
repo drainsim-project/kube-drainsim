@@ -27,10 +27,3 @@ body:
     attributes:
       label: 대안과 고려할 점
       description: 기존 도구, 더 작은 해결책, 예상되는 제약이 있다면 적어 주세요.
-  - type: checkboxes
-    id: disclosure_check
-    attributes:
-      label: 공개 전 확인
-      options:
-        - label: 예시에 토큰, kubeconfig, 개인정보와 민감한 운영정보가 포함되지 않았습니다.
-          required: true
