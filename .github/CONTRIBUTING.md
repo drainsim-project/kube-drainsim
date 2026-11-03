@@ -27,7 +27,7 @@ drainsim 팀원이 작업을 제안하고 PR로 반영하는 절차를 설명합
 | --- | --- |
 | [PR title](workflows/pr-title.yml) | PR 제목 형식 |
 | [Workflow review](workflows/ci.yml) | actionlint로 워크플로 검사 |
-| [Go checks](workflows/ci.yml) | Go 패키지가 있으면 포맷, 정적 분석, 테스트 |
+| [Go checks](workflows/ci.yml) | go.mod와 go.sum이 `go mod tidy` 결과와 같은지, Go 패키지가 있으면 포맷, 정적 분석, 테스트 |
 
 ## 보안
 

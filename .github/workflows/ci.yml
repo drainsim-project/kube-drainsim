@@ -47,8 +47,10 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-          # There is no go.sum until the first dependency is added.
-          cache-dependency-path: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Check go.mod and go.sum
+        run: bash scripts/check.sh tidy
 
       - name: Detect Go packages
         id: packages
