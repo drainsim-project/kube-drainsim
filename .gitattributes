@@ -1,3 +1,6 @@
-# Keep shell scripts and Go formatting consistent when core.autocrlf is on.
+# core.autocrlf가 켜져 있어도 셸 스크립트, Go 코드 및 모듈 파일은 LF 줄바꿈을 사용합니다.
+# go.sum의 CRLF 줄바꿈이 go mod tidy -diff에서 변경 사항으로 감지되는 문제를 방지합니다.
 *.sh text eol=lf
 *.go text eol=lf
+go.mod text eol=lf
+go.sum text eol=lf

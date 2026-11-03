@@ -104,7 +104,7 @@ batch         report-7xk2p       unknown      PDB report: observedGeneration 2 <
       "namespace": "payment",
       "name": "api-0",
       "result": "blocked",
-      "pdb": "api",
+      "pdbs": ["api"],
       "reason": "disruptionsAllowed=0, desiredHealthy=1, expectedPods=1"
     }
   ]

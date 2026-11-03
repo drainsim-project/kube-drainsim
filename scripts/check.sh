@@ -1,14 +1,27 @@
 #!/usr/bin/env bash
-# Runs the checks that CI runs. Usage: bash scripts/check.sh [step...]
-# Steps: fmt vet test lint workflows (default: all). Set RACE=0 to test
-# without the race detector, for example on Windows without mingw-w64.
+# CI와 같은 검사를 실행합니다. 사용법: bash scripts/check.sh [단계...]
+# 단계: tidy fmt vet test lint workflows (인자를 생략하면 전체 검사 실행).
+# mingw-w64가 없는 Windows 등에서 경쟁 상태 검사 없이 테스트하려면 RACE=0을 설정합니다.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-# Keep golangci-lint in sync with .github/workflows/ci.yml.
+# golangci-lint 버전을 .github/workflows/ci.yml과 동일하게 유지합니다.
 golangci_lint_version=v2.15.0
 actionlint_version=v1.7.12
+
+check_tidy() {
+  local diff
+  if diff="$(go mod tidy -diff)"; then
+    return 0
+  fi
+  # 모듈 다운로드 실패 같은 Go 실행 오류에는 변경 내역이 출력되지 않습니다.
+  if [[ -n $diff ]]; then
+    printf '%s\n' "$diff"
+    echo 'Run "go mod tidy" and commit go.mod and go.sum.' >&2
+  fi
+  return 1
+}
 
 check_fmt() {
   local go_root unformatted
@@ -43,7 +56,7 @@ check_workflows() {
 
 steps=("$@")
 if [[ ${#steps[@]} -eq 0 ]]; then
-  steps=(fmt vet test lint workflows)
+  steps=(tidy fmt vet test lint workflows)
 fi
 
 packages_checked=false
@@ -61,10 +74,10 @@ for step in "${steps[@]}"; do
         continue
       fi
       ;;
-    workflows)
+    tidy | workflows)
       ;;
     *)
-      echo "unknown step: $step (want fmt, vet, test, lint, workflows)" >&2
+      echo "unknown step: $step (want tidy, fmt, vet, test, lint, workflows)" >&2
       exit 2
       ;;
   esac
