@@ -53,16 +53,16 @@ dry-run은 거절 여부만 알려 주고, 어떤 PDB의 어떤 값 때문에 �
 
 ### eviction과 PDB
 
-퇴거 대상 Pod는 eviction API의 검사 순서를 따릅니다. 오류 상태이거나 판단 근거가 부족하면 drainsim은 `unknown`으로 분류합니다.
+퇴거 대상 Pod는 eviction API의 검사 순서를 따릅니다. 오류 상태이거나 판단 근거가 부족하면 drainsim은 `undetermined`로 분류합니다.
 
 1. `Pending`, `Succeeded`, `Failed` 상태의 Pod와 이미 삭제 중인 Pod는 PDB를 확인하지 않고 퇴거됩니다. → `evictable`
 2. 같은 네임스페이스에서 selector가 Pod 라벨과 맞는 PDB를 찾습니다. 없으면 → `evictable`, 2개 이상이면 API가 500으로 거절합니다. → `blocked`
 3. Ready가 아닌 Pod는 PDB 상태를 검사하기 전에 다음 예외를 확인합니다. 예외에 해당하면 예산을 쓰지 않고 퇴거되고(→ `evictable`), 해당하지 않으면 4번부터 이어서 판단합니다.
    - `unhealthyPodEvictionPolicy`가 `AlwaysAllow`
    - 기본값 `IfHealthyBudget`에서 `currentHealthy >= desiredHealthy`이고 `desiredHealthy > 0`
-4. `status.observedGeneration`이 `metadata.generation`보다 작으면 API가 지금은 429로 거절하고, 상태 값으로 예산을 판단할 수 없습니다. → `unknown`
-5. `disruptionsAllowed`가 음수이거나 `status.disruptedPods` 항목이 2,000개를 초과하면 API가 403으로 거절합니다. 정상적인 예산 부족과 구분합니다. → `unknown`
-6. `DisruptionAllowed` 조건의 reason이 `SyncFailed`이면 PDB 컨트롤러가 동기화에 실패한 상태입니다. API가 이 조건을 직접 검사하지는 않지만, drainsim은 예산 부족의 원인을 단정하지 않습니다. 다른 상태 값이 서로 맞지 않아 원인을 판단할 수 없는 경우도 같습니다. → `unknown`
+4. `status.observedGeneration`이 `metadata.generation`보다 작으면 API가 지금은 429로 거절하고, 상태 값으로 예산을 판단할 수 없습니다. → `undetermined`
+5. `disruptionsAllowed`가 음수이거나 `status.disruptedPods` 항목이 2,000개를 초과하면 API가 403으로 거절합니다. 정상적인 예산 부족과 구분합니다. → `undetermined`
+6. `DisruptionAllowed` 조건의 reason이 `SyncFailed`이면 PDB 컨트롤러가 동기화에 실패한 상태입니다. API가 이 조건을 직접 검사하지는 않지만, drainsim은 예산 부족의 원인을 단정하지 않습니다. 다른 상태 값이 서로 맞지 않아 원인을 판단할 수 없는 경우도 같습니다. → `undetermined`
 7. 위 검사를 통과하고 `disruptionsAllowed`가 0이면 API가 429로 거절합니다.
    - `desiredHealthy`가 `expectedPods` 이상이면 Pod가 `expectedPods`만큼 정상이어도 예산이 0입니다. → `blocked`
    - 그렇지 않으면 현재 예산이 부족한 상태입니다. → `no-budget`
@@ -79,7 +79,7 @@ dry-run은 거절 여부만 알려 주고, 어떤 PDB의 어떤 값 때문에 �
 | `blocked` | PDB 설정 때문에 eviction이 거절됨. 정상 Pod가 `expectedPods`만큼 있어도 예산이 0이거나, PDB가 2개 이상 걸림 |
 | `needs-flag` | 표시한 `kubectl drain` 옵션이 없으면 drain이 Pod를 퇴거하기 전에 중단됨 |
 | `skipped` | drain이 건드리지 않음 |
-| `unknown` | PDB 오류 상태이거나 판단할 근거가 부족함 |
+| `undetermined` | PDB 오류 상태이거나 판단할 근거가 부족함 |
 
 `no-budget`과 `blocked`는 지금 eviction이 거절되는 근거를 설명합니다. 예산이 회복될지, 언제 회복될지, drain이 최종적으로 성공할지는 판단하지 않습니다. `evictable`도 PDB가 막지 않는다는 뜻일 뿐, drain 전체의 성공이나 서비스 가용성을 보장하지 않습니다.
 
@@ -93,7 +93,7 @@ shop          web-6d4f9c-fghij   no-budget    PDB web: budget used by web-6d4f9c
 payment       api-0              blocked      PDB api: disruptionsAllowed=0, desiredHealthy=1, expectedPods=1
 kube-system   kube-proxy-x2k9q   skipped      DaemonSet (--ignore-daemonsets)
 ops           debug              needs-flag   no controller (--force)
-batch         report-7xk2p       unknown      PDB report: observedGeneration 2 < generation 3
+batch         report-7xk2p       undetermined PDB report: observedGeneration 2 < generation 3
 ```
 
 ```json
@@ -113,8 +113,8 @@ batch         report-7xk2p       unknown      PDB report: observedGeneration 2 <
 
 ## 정확성 기준
 
-- 가장 피할 오류는 `false-safe`입니다. 문제없다고 했는데 실제 drain이 막히는 경우입니다. 근거가 부족하면 `evictable` 대신 `unknown`으로 답합니다.
-- 실제 drain과 비교한 결과는 일치, `unknown`, `false-safe`, `false-blocked`, 기타 불일치로 분류합니다. `false-blocked`는 막힌다고 했는데 실제 drain이 성공한 경우입니다.
+- 가장 피할 오류는 `false-safe`입니다. 문제없다고 했는데 실제 drain이 막히는 경우입니다. 근거가 부족하면 `evictable` 대신 `undetermined`로 답합니다.
+- 실제 drain과 비교한 결과는 일치, `undetermined`, `false-safe`, `false-blocked`, 기타 불일치로 분류합니다. `false-blocked`는 막힌다고 했는데 실제 drain이 성공한 경우입니다.
 - drain timeout만으로 PDB를 원인으로 보지 않습니다. eviction 거절 메시지와 PDB 상태를 같이 확인합니다.
 - 사례 하나가 맞았다고 다른 환경에서도 맞다고 보지 않습니다. 비교 결과는 사례마다 PR에 남깁니다.
 
