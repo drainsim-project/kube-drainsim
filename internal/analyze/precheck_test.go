@@ -10,7 +10,7 @@ import (
 )
 
 // TestPrecheckPod는 PDB 검사 생략 조건, namespace와 selector 매칭 및 반환 규칙을 확인합니다.
-// 공통 도우미로 입력을 만들고 PDB 정책과 예산은 검사하지 않습니다.
+// 공통 도우미로 입력을 만들고 정책 예외는 별도 테이블에서 확인합니다.
 func TestPrecheckPod(t *testing.T) {
 	webSelector := &metav1.LabelSelector{MatchLabels: map[string]string{"app": "web"}}
 	webPDB := newPDB("shop", "web-pdb", webSelector)
@@ -179,6 +179,158 @@ func TestPrecheckPod(t *testing.T) {
 			}
 			if !reflect.DeepEqual(pdb, tt.wantPDB) {
 				t.Errorf("precheckPod() pdb = %#v, want %#v", pdb, tt.wantPDB)
+			}
+		})
+	}
+}
+
+// TestPrecheckPodUnhealthyPolicy는 Ready 상태와 정책별 예외, 기존 반환 규칙을 확인합니다.
+func TestPrecheckPodUnhealthyPolicy(t *testing.T) {
+	alwaysAllow := policyv1.AlwaysAllow
+	ifHealthyBudget := policyv1.IfHealthyBudget
+	tests := []struct {
+		name           string
+		conditions     []corev1.PodCondition
+		policy         *policyv1.UnhealthyPodEvictionPolicyType
+		currentHealthy int32
+		desiredHealthy int32
+		multiplePDBs   bool
+		wantResult     Result
+		wantReason     string
+	}{
+		{
+			name:       "Ready=False이고 AlwaysAllow이면 예산 0이어도 허용",
+			conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionFalse}},
+			policy:     &alwaysAllow, desiredHealthy: 2,
+			wantResult: Evictable,
+			wantReason: "Pod is not Ready; PDB web-pdb: unhealthyPodEvictionPolicy=AlwaysAllow",
+		},
+		{
+			name:       "Ready 조건이 없어도 AlwaysAllow 예외 적용",
+			policy:     &alwaysAllow,
+			wantResult: Evictable,
+			wantReason: "Pod is not Ready; PDB web-pdb: unhealthyPodEvictionPolicy=AlwaysAllow",
+		},
+		{
+			name: "다른 조건이 True여도 Ready=Unknown이면 예외 적용",
+			conditions: []corev1.PodCondition{
+				{Type: corev1.PodScheduled, Status: corev1.ConditionTrue},
+				{Type: corev1.PodReady, Status: corev1.ConditionUnknown},
+			},
+			policy:     &alwaysAllow,
+			wantResult: Evictable,
+			wantReason: "Pod is not Ready; PDB web-pdb: unhealthyPodEvictionPolicy=AlwaysAllow",
+		},
+		{
+			name:           "기본 정책에서 정상 수가 양수인 최소치와 같으면 허용",
+			currentHealthy: 2, desiredHealthy: 2,
+			wantResult: Evictable,
+			wantReason: "Pod is not Ready; PDB web-pdb: unhealthyPodEvictionPolicy=IfHealthyBudget, currentHealthy=2 >= desiredHealthy=2",
+		},
+		{
+			name:       "IfHealthyBudget에서 정상 수가 양수인 최소치와 같으면 허용",
+			conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionFalse}},
+			policy:     &ifHealthyBudget, currentHealthy: 2, desiredHealthy: 2,
+			wantResult: Evictable,
+			wantReason: "Pod is not Ready; PDB web-pdb: unhealthyPodEvictionPolicy=IfHealthyBudget, currentHealthy=2 >= desiredHealthy=2",
+		},
+		{
+			name:           "기본 정책에서 정상 수가 최소치를 초과하면 허용",
+			currentHealthy: 3, desiredHealthy: 2,
+			wantResult: Evictable,
+			wantReason: "Pod is not Ready; PDB web-pdb: unhealthyPodEvictionPolicy=IfHealthyBudget, currentHealthy=3 >= desiredHealthy=2",
+		},
+		{
+			name:   "IfHealthyBudget에서 정상 수가 최소치를 초과하면 허용",
+			policy: &ifHealthyBudget, currentHealthy: 3, desiredHealthy: 2,
+			wantResult: Evictable,
+			wantReason: "Pod is not Ready; PDB web-pdb: unhealthyPodEvictionPolicy=IfHealthyBudget, currentHealthy=3 >= desiredHealthy=2",
+		},
+		{
+			name:           "기본 정책에서 최소치 미달이면 다음 검사",
+			currentHealthy: 1, desiredHealthy: 2,
+		},
+		{
+			name:   "IfHealthyBudget에서 최소치 미달이면 다음 검사",
+			policy: &ifHealthyBudget, currentHealthy: 1, desiredHealthy: 2,
+		},
+		{
+			name:           "기본 정책에서 desiredHealthy가 0이면 다음 검사",
+			currentHealthy: 1,
+		},
+		{
+			name:   "IfHealthyBudget에서 desiredHealthy가 0이면 다음 검사",
+			policy: &ifHealthyBudget, currentHealthy: 1,
+		},
+		{
+			name:       "Ready=True이면 AlwaysAllow라도 다음 검사",
+			conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+			policy:     &alwaysAllow,
+		},
+		{
+			name:           "Ready=True이면 기본 정책의 정상 수를 충족해도 다음 검사",
+			conditions:     []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+			currentHealthy: 2, desiredHealthy: 2,
+		},
+		{
+			name:       "Ready=True이면 IfHealthyBudget의 정상 수를 충족해도 다음 검사",
+			conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+			policy:     &ifHealthyBudget, currentHealthy: 2, desiredHealthy: 2,
+		},
+		{
+			name:   "PDB가 두 개면 AlwaysAllow보다 다중 매칭 차단 우선",
+			policy: &alwaysAllow, multiplePDBs: true,
+			wantResult: Blocked,
+			wantReason: "multiple PDBs match: web-pdb, other-pdb",
+		},
+		{
+			name:   "PDB가 두 개면 정상 수를 충족해도 차단",
+			policy: &ifHealthyBudget, currentHealthy: 2, desiredHealthy: 2, multiplePDBs: true,
+			wantResult: Blocked,
+			wantReason: "multiple PDBs match: web-pdb, other-pdb",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pod := newPod("shop", "web-1", withLabels(map[string]string{"app": "web"}))
+			pod.Status.Conditions = tt.conditions
+			pdb := newPDB("shop", "web-pdb", &metav1.LabelSelector{MatchLabels: map[string]string{"app": "web"}})
+			pdb.Spec.UnhealthyPodEvictionPolicy = tt.policy
+			pdb.Status.CurrentHealthy = tt.currentHealthy
+			pdb.Status.DesiredHealthy = tt.desiredHealthy
+			pdb.Status.DisruptionsAllowed = 0
+			pdbs := []policyv1.PodDisruptionBudget{pdb}
+			if tt.multiplePDBs {
+				otherPDB := *pdb.DeepCopy()
+				otherPDB.Name = "other-pdb"
+				pdbs = append(pdbs, otherPDB)
+			}
+
+			want := Verdict{}
+			wantPDB := &pdb
+			wantDone := tt.wantResult != ""
+			if wantDone {
+				want = Verdict{Namespace: "shop", Name: "web-1", Result: tt.wantResult,
+					PDBs: []string{"web-pdb"}, Reason: tt.wantReason}
+				if tt.multiplePDBs {
+					want.PDBs = append(want.PDBs, "other-pdb")
+				}
+				wantPDB = nil
+			}
+			before := pdbs[0].DeepCopy()
+			got, matchedPDB, done := precheckPod(pod, Snapshot{PDBs: pdbs})
+			if done != wantDone {
+				t.Errorf("precheckPod() done = %t, want %t", done, wantDone)
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("precheckPod() verdict = %#v, want %#v", got, want)
+			}
+			if !reflect.DeepEqual(matchedPDB, wantPDB) {
+				t.Errorf("precheckPod() pdb = %#v, want %#v", matchedPDB, wantPDB)
+			}
+			if !reflect.DeepEqual(&pdbs[0], before) {
+				t.Error("precheckPod() modified the input PDB")
 			}
 		})
 	}
