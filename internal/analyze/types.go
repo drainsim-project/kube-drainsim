@@ -28,8 +28,8 @@ const (
 	// Skipped는 kubectl drain이 Pod를 eviction 대상에서 제외하는 상태입니다.
 	// 예: --ignore-daemonsets가 지정된 상태에서 실행 중인 DaemonSet Pod입니다.
 	Skipped Result = "skipped"
-	// Unknown은 Pod의 eviction 가능 여부를 판단할 수 없는 상태입니다.
-	Unknown Result = "unknown"
+	// Undetermined는 PDB 오류 상태이거나 판단 근거가 부족해 Pod의 eviction 가능 여부를 판단할 수 없는 상태입니다.
+	Undetermined Result = "undetermined"
 )
 
 // Snapshot은 노드 하나의 Pod eviction 가능 여부를 분석하기 위한 입력 데이터입니다.
