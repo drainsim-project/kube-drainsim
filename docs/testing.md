@@ -17,6 +17,15 @@
 
 ## 예시 데이터와 fake client
 
+`internal/collect.Pods`는 대상 노드의 Pod 전체와 종료되지 않은 Pod의 소유자 DaemonSet을
+조회해 `analyze.Snapshot`을 반환합니다. PDB 조회는 포함하지 않으므로 PDB 분석 전에
+별도로 채워야 합니다. DaemonSet이 NotFound여도 Pod는 유지하며, 다른 조회 오류는
+부분 Snapshot을 사용하지 않도록 호출자에게 반환합니다.
+
+`go test ./internal/collect`는 fake client에 기록된 전체 네임스페이스 Pod 조회 요청과
+`spec.nodeName` 조건, 소유자 조회 대상과 중복 제거, NotFound 및 조회 오류 처리를 검증합니다.
+실제 API 서버의 필터링이나 drain 동작을 검증하는 테스트는 아닙니다.
+
 - 예시 데이터는 해당 테스트 패키지의 `testdata/`에 둡니다. 판단에 쓰는 필드와 상태만 넣고, 어떤 상황인지 테스트 이름이나 주석으로 밝힙니다.
 - PDB 상태(`disruptionsAllowed`, `currentHealthy` 등)를 직접 적었다면 그 값은 컨트롤러가 계산한 결과가 아니라 테스트의 전제입니다.
 - `client-go`의 fake client는 API 서버의 기본값 적용, 검증, 컨트롤러 동작을 흉내 내지 않습니다. fake client로는 매칭과 판단 로직까지만 확인하고, 실제 PDB와 drain 동작은 kind에서 확인합니다.
