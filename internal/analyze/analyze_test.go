@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,6 +22,7 @@ func TestAnalyze(t *testing.T) {
 	replicaSet := withController("apps/v1", "ReplicaSet", "web")
 	daemonSet := withController("apps/v1", "DaemonSet", "agent")
 
+	owner := appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Namespace: "shop", Name: "agent"}}
 	pendingDaemonPod := newPod("shop", "agent", daemonSet, withPhase(corev1.PodPending))
 	uncontrolledPod := newPod("shop", "debug", webLabels)
 	unprotectedPod := newPod("payment", "api-0", replicaSet)
@@ -37,8 +39,13 @@ func TestAnalyze(t *testing.T) {
 			want:     nil,
 		},
 		{
-			name:     "Pending DaemonSet Pod는 PDB 생략 검사보다 drain 필터가 우선",
-			snapshot: Snapshot{Pods: []corev1.Pod{pendingDaemonPod}},
+			name: "Pending DaemonSet Pod는 PDB 생략 검사보다 drain 필터가 우선",
+			// 소유자 DaemonSet이 존재하는 Pending Pod
+			snapshot: Snapshot{
+				Pods:       []corev1.Pod{pendingDaemonPod},
+				DaemonSets: []appsv1.DaemonSet{owner},
+			},
+			// Pending이어도 DaemonSet 필터가 먼저라 evictable이 아닌 skipped로 처리
 			want: []Verdict{
 				{Namespace: "shop", Name: "agent", Result: Skipped, Reason: "DaemonSet (--ignore-daemonsets)"},
 			},
@@ -138,8 +145,9 @@ func TestAnalyze(t *testing.T) {
 		{
 			name: "여러 경로의 결과를 Pod마다 하나씩 입력 순서대로 반환",
 			snapshot: Snapshot{
-				Pods: []corev1.Pod{pendingDaemonPod, protectedPod, unprotectedPod, uncontrolledPod},
-				PDBs: []policyv1.PodDisruptionBudget{webPDB},
+				Pods:       []corev1.Pod{pendingDaemonPod, protectedPod, unprotectedPod, uncontrolledPod},
+				DaemonSets: []appsv1.DaemonSet{owner},
+				PDBs:       []policyv1.PodDisruptionBudget{webPDB},
 			},
 			want: []Verdict{
 				{Namespace: "shop", Name: "agent", Result: Skipped, Reason: "DaemonSet (--ignore-daemonsets)"},
@@ -147,6 +155,46 @@ func TestAnalyze(t *testing.T) {
 					PDBs: []string{"web-pdb"}, Reason: "PDB budget analysis is not connected yet"},
 				{Namespace: "payment", Name: "api-0", Result: Evictable, Reason: "no matching PDB"},
 				{Namespace: "shop", Name: "debug", Result: NeedsFlag, Reason: "no controller (--force)"},
+			},
+		},
+		{
+			name: "소유자 없는 Running DaemonSet Pod",
+			snapshot: Snapshot{
+				Pods: []corev1.Pod{newPod("shop", "orphan-agent", daemonSet, webLabels, withPhase(corev1.PodRunning))},
+				PDBs: []policyv1.PodDisruptionBudget{webPDB, otherPDB},
+			},
+			want: []Verdict{
+				{Namespace: "shop", Name: "orphan-agent", Result: NeedsFlag, Reason: "DaemonSet shop/agent not found (--force required)"},
+			},
+		},
+		{
+			name: "소유자 없는 Pending DaemonSet Pod",
+			snapshot: Snapshot{
+				Pods: []corev1.Pod{newPod("shop", "orphan-agent", daemonSet, webLabels, withPhase(corev1.PodPending))},
+				PDBs: []policyv1.PodDisruptionBudget{webPDB, otherPDB},
+			},
+			want: []Verdict{
+				{Namespace: "shop", Name: "orphan-agent", Result: NeedsFlag, Reason: "DaemonSet shop/agent not found (--force required)"},
+			},
+		},
+		{
+			name: "소유자 없는 Succeeded DaemonSet Pod",
+			snapshot: Snapshot{
+				Pods: []corev1.Pod{newPod("shop", "orphan-agent", daemonSet, webLabels, withPhase(corev1.PodSucceeded))},
+				PDBs: []policyv1.PodDisruptionBudget{webPDB, otherPDB},
+			},
+			want: []Verdict{
+				{Namespace: "shop", Name: "orphan-agent", Result: Evictable, Reason: "Pod phase is Succeeded"},
+			},
+		},
+		{
+			name: "소유자 없는 Failed DaemonSet Pod",
+			snapshot: Snapshot{
+				Pods: []corev1.Pod{newPod("shop", "orphan-agent", daemonSet, webLabels, withPhase(corev1.PodFailed))},
+				PDBs: []policyv1.PodDisruptionBudget{webPDB, otherPDB},
+			},
+			want: []Verdict{
+				{Namespace: "shop", Name: "orphan-agent", Result: Evictable, Reason: "Pod phase is Failed"},
 			},
 		},
 	}

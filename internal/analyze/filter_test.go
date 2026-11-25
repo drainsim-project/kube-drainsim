@@ -4,24 +4,29 @@ import (
 	"reflect"
 	"testing"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // TestFilterPod는 --ignore-daemonsets --delete-emptydir-data를 사용하고
-// --force는 사용하지 않는 조건에서 Issue #6의 분류와 검사 순서를 확인합니다.
-// DaemonSet은 존재한다고 가정하며 API 조회 없이 공통 도우미로 입력을 만듭니다.
+// --force는 사용하지 않는 조건에서 분류와 소유자 존재 여부, 검사 순서를 확인합니다.
+// API 조회 없이 공통 도우미로 입력을 만듭니다.
 func TestFilterPod(t *testing.T) {
+	owner := appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Namespace: "kube-system", Name: "agent"}}
 	tests := []struct {
-		name     string
-		pod      corev1.Pod
-		want     Verdict
-		wantDone bool
+		name       string
+		pod        corev1.Pod
+		daemonSets []appsv1.DaemonSet
+		want       Verdict
+		wantDone   bool
 	}{
 		{
-			name: "apps/v1 DaemonSet Pod는 건너뜀",
-			pod: newPod("kube-system", "agent",
+			name:       "apps/v1 DaemonSet Pod는 건너뜀",
+			daemonSets: []appsv1.DaemonSet{owner},
+			pod: newPod("kube-system", "agent-pod",
 				withController("apps/v1", "DaemonSet", "agent")),
-			want:     Verdict{Namespace: "kube-system", Name: "agent", Result: Skipped, Reason: "DaemonSet (--ignore-daemonsets)"},
+			want:     Verdict{Namespace: "kube-system", Name: "agent-pod", Result: Skipped, Reason: "DaemonSet (--ignore-daemonsets)"},
 			wantDone: true,
 		},
 		{
@@ -38,9 +43,10 @@ func TestFilterPod(t *testing.T) {
 			wantDone: true,
 		},
 		{
-			name: "ReplicaSet Pod는 다음 검사로 넘김",
-			pod: newPod("shop", "web",
-				withController("apps/v1", "ReplicaSet", "web")),
+			name:       "동명 DaemonSet이 있어도 ReplicaSet Pod는 다음 검사로 넘김",
+			daemonSets: []appsv1.DaemonSet{owner},
+			pod: newPod("kube-system", "replica-pod",
+				withController("apps/v1", "ReplicaSet", "agent")),
 		},
 		{
 			name:     "ownerReferences 없는 mirror Pod도 컨트롤러 검사 전에 건너뜀",
@@ -56,9 +62,10 @@ func TestFilterPod(t *testing.T) {
 			wantDone: true,
 		},
 		{
-			name: "다른 API 그룹의 DaemonSet Pod는 다음 검사로 넘김",
-			pod: newPod("ops", "custom-agent",
-				withController("apps.kruise.io/v1alpha1", "DaemonSet", "custom-agent")),
+			name:       "동명 DaemonSet이 있어도 다른 API 그룹이면 다음 검사로 넘김",
+			daemonSets: []appsv1.DaemonSet{owner},
+			pod: newPod("kube-system", "custom-agent",
+				withController("apps.kruise.io/v1alpha1", "DaemonSet", "agent")),
 		},
 		{
 			name: "Failed DaemonSet Pod는 다음 검사로 넘김",
@@ -77,17 +84,58 @@ func TestFilterPod(t *testing.T) {
 			wantDone: true,
 		},
 		{
-			name: "DaemonSet과 mirror 조건이 겹치면 DaemonSet 이유가 우선",
+			name:       "DaemonSet과 mirror 조건이 겹치면 DaemonSet 이유가 우선",
+			daemonSets: []appsv1.DaemonSet{owner},
 			pod: newPod("kube-system", "both",
 				withController("apps/v1", "DaemonSet", "agent"), withMirrorAnnotation()),
 			want:     Verdict{Namespace: "kube-system", Name: "both", Result: Skipped, Reason: "DaemonSet (--ignore-daemonsets)"},
 			wantDone: true,
 		},
+		{
+			name:     "소유자 없는 DaemonSet Pod는 force 필요",
+			pod:      newPod("kube-system", "agent-pod", withController("apps/v1", "DaemonSet", "agent")),
+			want:     Verdict{Namespace: "kube-system", Name: "agent-pod", Result: NeedsFlag, Reason: "DaemonSet kube-system/agent not found (--force required)"},
+			wantDone: true,
+		},
+		{
+			name:       "다른 namespace의 동명 DaemonSet은 소유자가 아님",
+			daemonSets: []appsv1.DaemonSet{{ObjectMeta: metav1.ObjectMeta{Namespace: "other", Name: "agent"}}},
+			pod:        newPod("kube-system", "agent-pod", withController("apps/v1", "DaemonSet", "agent")),
+			want:       Verdict{Namespace: "kube-system", Name: "agent-pod", Result: NeedsFlag, Reason: "DaemonSet kube-system/agent not found (--force required)"},
+			wantDone:   true,
+		},
+		{
+			name:       "같은 namespace의 다른 이름은 소유자가 아님",
+			daemonSets: []appsv1.DaemonSet{{ObjectMeta: metav1.ObjectMeta{Namespace: "kube-system", Name: "other"}}},
+			pod:        newPod("kube-system", "agent-pod", withController("apps/v1", "DaemonSet", "agent")),
+			want:       Verdict{Namespace: "kube-system", Name: "agent-pod", Result: NeedsFlag, Reason: "DaemonSet kube-system/agent not found (--force required)"},
+			wantDone:   true,
+		},
+		{
+			name:     "소유자가 없고 mirror 조건도 겹치면 DaemonSet 오류가 우선",
+			pod:      newPod("kube-system", "agent-pod", withController("apps/v1", "DaemonSet", "agent"), withMirrorAnnotation()),
+			want:     Verdict{Namespace: "kube-system", Name: "agent-pod", Result: NeedsFlag, Reason: "DaemonSet kube-system/agent not found (--force required)"},
+			wantDone: true,
+		},
+		{
+			name: "Succeeded DaemonSet Pod는 소유자가 없어도 다음 검사로 넘김",
+			pod:  newPod("kube-system", "finished-agent", withController("apps/v1", "DaemonSet", "agent"), withPhase(corev1.PodSucceeded)),
+		},
+		{
+			name:       "Succeeded DaemonSet Pod는 소유자가 있어도 다음 검사로 넘김",
+			daemonSets: []appsv1.DaemonSet{owner},
+			pod:        newPod("kube-system", "finished-agent", withController("apps/v1", "DaemonSet", "agent"), withPhase(corev1.PodSucceeded)),
+		},
+		{
+			name:       "Failed DaemonSet Pod는 소유자가 있어도 다음 검사로 넘김",
+			daemonSets: []appsv1.DaemonSet{owner},
+			pod:        newPod("kube-system", "finished-agent", withController("apps/v1", "DaemonSet", "agent"), withPhase(corev1.PodFailed)),
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, done := filterPod(tt.pod, Snapshot{})
+			got, done := filterPod(tt.pod, Snapshot{DaemonSets: tt.daemonSets})
 			if done != tt.wantDone {
 				t.Errorf("filterPod() done = %t, want %t", done, tt.wantDone)
 			}
