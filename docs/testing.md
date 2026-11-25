@@ -17,6 +17,13 @@
 
 ## 예시 데이터와 fake client
 
+`go test ./internal/analyze`는 PDB 상태의 세대 갱신 지연, 음수 예산,
+`disruptedPods` 2,000개·2,001개 경계와 `DisruptionAllowed`의 `SyncFailed`를 검증합니다.
+eviction 승인 직후의 예산 선차감에 따른 수치 차이만으로는 오류로 분류하지 않습니다.
+연결 테스트는 Ready 정책 예외가 상태 검사보다 우선하며, 상태가 정상이고 예산이 0이어도
+예산 판단이 연결되기 전에는 `undetermined`를 유지하는지 확인합니다.
+이 테스트는 메모리 내 입력을 사용하며 실제 PDB 컨트롤러 갱신이나 eviction 동작을 검증하지 않습니다.
+
 `internal/collect.Pods`는 대상 노드의 Pod 전체와 종료되지 않은 Pod의 소유자 DaemonSet을
 조회해 `analyze.Snapshot`을 반환합니다. PDB 조회는 포함하지 않으므로 PDB 분석 전에
 별도로 채워야 합니다. DaemonSet이 NotFound여도 Pod는 유지하며, 다른 조회 오류는

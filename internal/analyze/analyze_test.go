@@ -1,6 +1,7 @@
 package analyze
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -77,7 +78,7 @@ func TestAnalyze(t *testing.T) {
 			},
 			want: []Verdict{
 				{Namespace: "shop", Name: "web-1", Result: Undetermined,
-					PDBs: []string{"web-pdb"}, Reason: "PDB analysis rules are not connected yet"},
+					PDBs: []string{"web-pdb"}, Reason: "PDB budget analysis is not connected yet"},
 			},
 		},
 		{
@@ -127,7 +128,7 @@ func TestAnalyze(t *testing.T) {
 			},
 			want: []Verdict{
 				{Namespace: "shop", Name: "unknown", Result: Undetermined,
-					PDBs: []string{"web-pdb"}, Reason: "PDB analysis rules are not connected yet"},
+					PDBs: []string{"web-pdb"}, Reason: "PDB budget analysis is not connected yet"},
 			},
 		},
 		{
@@ -151,7 +152,7 @@ func TestAnalyze(t *testing.T) {
 			want: []Verdict{
 				{Namespace: "shop", Name: "agent", Result: Skipped, Reason: "DaemonSet (--ignore-daemonsets)"},
 				{Namespace: "shop", Name: "web-1", Result: Undetermined,
-					PDBs: []string{"web-pdb"}, Reason: "PDB analysis rules are not connected yet"},
+					PDBs: []string{"web-pdb"}, Reason: "PDB budget analysis is not connected yet"},
 				{Namespace: "payment", Name: "api-0", Result: Evictable, Reason: "no matching PDB"},
 				{Namespace: "shop", Name: "debug", Result: NeedsFlag, Reason: "no controller (--force)"},
 			},
@@ -209,6 +210,79 @@ func TestAnalyze(t *testing.T) {
 				if !reflect.DeepEqual(got[i], tt.want[i]) {
 					t.Errorf("Analyze()[%d] = %#v, want %#v", i, got[i], tt.want[i])
 				}
+			}
+		})
+	}
+}
+
+// TestAnalyzePDBStatus는 상태 검사 연결과 Ready 정책 예외의 우선순위를 확인합니다.
+func TestAnalyzePDBStatus(t *testing.T) {
+	alwaysAllow := policyv1.AlwaysAllow
+	ifHealthyBudget := policyv1.IfHealthyBudget
+	tests := []struct {
+		name       string
+		generation int64
+		status     policyv1.PodDisruptionBudgetStatus
+		disrupted  int
+		policy     *policyv1.UnhealthyPodEvictionPolicyType
+		ready      corev1.ConditionStatus
+		wantResult Result
+		wantReason string
+	}{
+		{name: "갱신 전 세대는 상태 검사로 판단 불가", generation: 2,
+			status:     policyv1.PodDisruptionBudgetStatus{ObservedGeneration: 1},
+			wantResult: Undetermined, wantReason: "PDB web-pdb: status.observedGeneration=1 < metadata.generation=2"},
+		{name: "음수 예산은 상태 검사로 판단 불가",
+			status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: -1},
+			wantResult: Undetermined, wantReason: "PDB web-pdb: status.disruptionsAllowed=-1 < 0"},
+		{name: "disruptedPods 2001개는 상태 검사로 판단 불가", disrupted: 2001,
+			wantResult: Undetermined, wantReason: "PDB web-pdb: status.disruptedPods count=2001 > 2000"},
+		{name: "SyncFailed는 상태 검사로 판단 불가",
+			status: policyv1.PodDisruptionBudgetStatus{Conditions: []metav1.Condition{
+				{Type: policyv1.DisruptionAllowedCondition, Reason: policyv1.SyncFailedReason},
+			}},
+			wantResult: Undetermined, wantReason: "PDB web-pdb: status.conditions[type=DisruptionAllowed].reason=SyncFailed"},
+		{name: "정상 상태의 예산 0은 예산 판단 미연결로 판단 불가",
+			wantResult: Undetermined, wantReason: "PDB budget analysis is not connected yet"},
+		{name: "Ready Pod의 예산 선차감은 상태 오류로 분류하지 않음", ready: corev1.ConditionTrue,
+			status: policyv1.PodDisruptionBudgetStatus{CurrentHealthy: 3, DesiredHealthy: 2}, disrupted: 1,
+			wantResult: Undetermined, wantReason: "PDB budget analysis is not connected yet"},
+		{name: "AlwaysAllow 예외는 세대 지연과 음수 예산 및 항목 초과보다 우선", generation: 2,
+			policy: &alwaysAllow, status: policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: -1}, disrupted: 2001,
+			wantResult: Evictable, wantReason: "Pod is not Ready; PDB web-pdb: unhealthyPodEvictionPolicy=AlwaysAllow"},
+		{name: "기본 정책 예외는 SyncFailed보다 우선",
+			status: policyv1.PodDisruptionBudgetStatus{CurrentHealthy: 2, DesiredHealthy: 2, Conditions: []metav1.Condition{
+				{Type: policyv1.DisruptionAllowedCondition, Reason: policyv1.SyncFailedReason},
+			}},
+			wantResult: Evictable, wantReason: "Pod is not Ready; PDB web-pdb: unhealthyPodEvictionPolicy=IfHealthyBudget, currentHealthy=2 >= desiredHealthy=2"},
+		{name: "IfHealthyBudget 예외는 세대 지연보다 우선", generation: 2, policy: &ifHealthyBudget,
+			status:     policyv1.PodDisruptionBudgetStatus{CurrentHealthy: 2, DesiredHealthy: 2},
+			wantResult: Evictable, wantReason: "Pod is not Ready; PDB web-pdb: unhealthyPodEvictionPolicy=IfHealthyBudget, currentHealthy=2 >= desiredHealthy=2"},
+		{name: "Ready=True이면 AlwaysAllow여도 상태 검사 진행", generation: 2, policy: &alwaysAllow, ready: corev1.ConditionTrue,
+			wantResult: Undetermined, wantReason: "PDB web-pdb: status.observedGeneration=0 < metadata.generation=2"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pod := newPod("shop", "web-1", withController("apps/v1", "ReplicaSet", "web"),
+				withLabels(map[string]string{"app": "web"}))
+			if tt.ready != "" {
+				pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: tt.ready}}
+			}
+			pdb := newPDB("shop", "web-pdb", &metav1.LabelSelector{MatchLabels: map[string]string{"app": "web"}})
+			pdb.Generation = tt.generation
+			pdb.Spec.UnhealthyPodEvictionPolicy = tt.policy
+			pdb.Status = tt.status
+			if tt.disrupted > 0 {
+				pdb.Status.DisruptedPods = make(map[string]metav1.Time, tt.disrupted)
+				for i := 0; i < tt.disrupted; i++ {
+					pdb.Status.DisruptedPods[fmt.Sprintf("web-%d", i)] = metav1.Unix(0, 0)
+				}
+			}
+			got := Analyze(Snapshot{Pods: []corev1.Pod{pod}, PDBs: []policyv1.PodDisruptionBudget{pdb}})
+			want := []Verdict{{Namespace: "shop", Name: "web-1", Result: tt.wantResult,
+				PDBs: []string{"web-pdb"}, Reason: tt.wantReason}}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("Analyze() = %#v, want %#v", got, want)
 			}
 		})
 	}
