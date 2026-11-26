@@ -66,7 +66,7 @@ dry-run은 거절 여부만 알려 주고, 어떤 PDB의 어떤 값 때문에 �
 7. 위 검사를 통과하고 `disruptionsAllowed`가 0이면 API가 429로 거절합니다.
    - `desiredHealthy`가 `expectedPods` 이상이면 Pod가 `expectedPods`만큼 정상이어도 예산이 0입니다. → `blocked`
    - 그렇지 않으면 현재 예산이 부족한 상태입니다. → `no-budget`
-8. `disruptionsAllowed`가 1 이상이면 eviction마다 1씩 줄어듭니다. 같은 PDB에 묶인 노드의 Pod 중 `disruptionsAllowed`개까지는 → `evictable`, 나머지는 → `no-budget`. 어느 Pod가 먼저 예산을 쓸지는 정해져 있지 않습니다.
+8. `disruptionsAllowed`가 1 이상이면 eviction마다 1씩 줄어듭니다. 같은 PDB에 묶인 노드의 Pod 중 `disruptionsAllowed`개까지는 → `evictable`, 나머지는 → `no-budget`. 앞선 규칙에서 결과가 정해진 Pod는 예산을 쓰지 않습니다. `needs-flag`로 분류한 Pod도 예산 배분에 넣지 않으므로, 안내한 옵션을 붙여 drain하면 그 Pod가 같은 PDB의 예산을 함께 써서 `evictable`로 판단한 Pod가 거절될 수 있습니다. `kubectl drain`은 Pod마다 eviction을 동시에 요청하므로 어느 Pod가 먼저 예산을 쓸지는 정해져 있지 않습니다. drainsim은 입력 순서와 관계없이 같은 결과를 내도록 Pod의 네임스페이스와 이름순으로 예산을 배분하고, 결과는 입력한 Pod 순서대로 반환합니다. 이 배분 순서는 실제 eviction 순서를 보장하지 않습니다.
 
 정상 동기화 시 PDB 컨트롤러는 예산을 `currentHealthy - desiredHealthy`로 계산하고, 계산 결과가 0 이하이거나 `expectedPods`가 0 이하이면 0으로 둡니다. 동기화 실패 때도 예산을 0으로 두므로 숫자만으로 원인을 판단하지 않습니다. 또한 `disruptedPods`에 기록된 기존 Ready Pod는 일시적으로 `currentHealthy`에서 제외됩니다. 삭제되지 않은 Pod의 기록이 만료되면 새 Pod 생성이나 Ready 전환 없이도 다시 계산에 포함되어 예산이 회복될 수 있습니다.
 
@@ -122,7 +122,6 @@ batch         report-7xk2p       undetermined PDB report: observedGeneration 2 <
 
 - server dry-run eviction을 보조 근거로 쓸지. 쓰려면 `pods/eviction` 생성 권한이 필요해서 조회 전용 원칙과 부딪힙니다.
 - `--ignore-daemonsets` 같은 drain 옵션을 drainsim도 입력으로 받아 같은 기준으로 거를지
-- 같은 PDB의 Pod 중 어느 Pod를 `evictable`로 표시할지
 - JSON 필드 이름과 형식이 바뀔 때의 호환성 정책
 - 여러 노드 분석을 언제 범위에 넣을지
 

@@ -35,6 +35,14 @@ func withPhase(phase corev1.PodPhase) podOption {
 	}
 }
 
+// withReady는 Pod에 지정한 상태의 Ready 조건을 추가하는 설정 함수를 반환합니다.
+// Ready 정책 예외를 적용할지 정하는 Pod를 테스트 입력으로 만듭니다.
+func withReady(status corev1.ConditionStatus) podOption {
+	return func(pod *corev1.Pod) {
+		pod.Status.Conditions = append(pod.Status.Conditions, corev1.PodCondition{Type: corev1.PodReady, Status: status})
+	}
+}
+
 // withLabels는 Pod에 라벨을 추가하는 설정 함수를 반환합니다.
 // PDB의 selector와 비교할 라벨을 가진 Pod를 테스트 입력으로 만듭니다.
 func withLabels(labels map[string]string) podOption {
