@@ -20,8 +20,12 @@
 `go test ./internal/analyze`는 PDB 상태의 세대 갱신 지연, 음수 예산,
 `disruptedPods` 2,000개·2,001개 경계와 `DisruptionAllowed`의 `SyncFailed`를 검증합니다.
 eviction 승인 직후의 예산 선차감에 따른 수치 차이만으로는 오류로 분류하지 않습니다.
-연결 테스트는 Ready 정책 예외가 상태 검사보다 우선하며, 상태가 정상이고 예산이 0이어도
-예산 판단이 연결되기 전에는 `undetermined`를 유지하는지 확인합니다.
+예산 판단은 원래 `disruptionsAllowed`가 0이면 `desiredHealthy`와 `expectedPods`를 비교해
+`blocked`와 `no-budget`을 구분하고, 양수이면 같은 PDB를 공유하는 Pod가 남은 예산을 나눠 쓰며
+다 쓴 뒤의 Pod는 `no-budget`으로 분류하는지 검증합니다. PDB는 네임스페이스와 이름으로 구분합니다.
+연결 테스트는 Ready 정책 예외가 상태 검사보다 우선하고, 앞선 검사에서 결과가 정해진 Pod는
+예산을 쓰지 않는지 확인합니다. 예산은 Pod의 네임스페이스와 이름순으로 배분하되 결과는 입력 순서를
+유지하며, 같은 Snapshot을 다시 분석해도 결과가 같고 입력이 바뀌지 않는지도 확인합니다.
 이 테스트는 메모리 내 입력을 사용하며 실제 PDB 컨트롤러 갱신이나 eviction 동작을 검증하지 않습니다.
 
 `internal/collect.Pods`는 대상 노드의 Pod 전체와 종료되지 않은 Pod의 소유자 DaemonSet을
